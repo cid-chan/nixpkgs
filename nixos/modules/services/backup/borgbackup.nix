@@ -118,16 +118,34 @@ let
   # Paths listed in ReadWritePaths must exist before service is started
   mkActivationScript = name: cfg:
     let
-      install = "install -o ${cfg.user} -g ${cfg.group}";
+      mkdir = "mkdir_ensure_user ${cfg.user} ${cfg.group}";
     in
       nameValuePair "borgbackup-job-${name}" (stringAfter [ "users" ] (''
+        # "install -o USER -g GROUP -d" recursively creates directories
+        # but does not correctly set the permissions of any parent directory
+        # created by the command.
+        #
+        # Since this command is run very early during this process, the entire
+        # .config and .cache directory might be owned by root.
+        #
+        # This might result in home-manager unable to create directories if run
+        # in a tmpfs on root and tmpfs on home scenario.
+        mkdir_ensure_user() {
+           if [ ! -d "$3" ]; then
+             mkdir_ensure_user $1 $2 "$(dirname $3)"
+             mkdir "$3"
+             chown $1:$2 "$3"
+           fi
+        }
+        
         # Ensure that the home directory already exists
         # We can't assert createHome == true because that's not the case for root
         cd "${config.users.users.${cfg.user}.home}"
-        ${install} -d .config/borg
-        ${install} -d .cache/borg
+        ${mkdir} .config/borg
+        ${mkdir} .cache/borg
+        
       '' + optionalString (isLocalPath cfg.repo && !cfg.removableDevice) ''
-        ${install} -d ${escapeShellArg cfg.repo}
+        ${mkdir} ${escapeShellArg cfg.repo}
       ''));
 
   mkPassAssertion = name: cfg: {
