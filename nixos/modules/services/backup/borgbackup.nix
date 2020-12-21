@@ -134,7 +134,7 @@ let
            if [ ! -d "$3" ]; then
              mkdir_ensure_user $1 $2 "$(dirname $3)"
              mkdir "$3"
-             chown ${1}:${2} "$3"
+             chown $1:$2 "$3"
            fi
         }
         
